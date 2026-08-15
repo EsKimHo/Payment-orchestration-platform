@@ -1,12 +1,12 @@
-from fastapi import FastAPI
+import json
+from fastapi import FastAPI, Request, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
-
 from app.database import SessionLocal
-from app.models import Payment, IdempotencyKey, AuditLog
+from app.models import Payment, IdempotencyKey, AuditLog, GatewayAttempt, ProcessedWebhook
 from app.queue_config import task_queue
 from app.tasks import process_payment
-
+from app.security import verify_signature
 app = FastAPI()
 
 
@@ -66,3 +66,47 @@ def create_payment(req: PaymentRequest):
     }
     db.close()
     return response
+
+@app.post("/webhooks/gateway-callback")
+async def gateway_webhook(request: Request, x_signature: str = Header(...)):
+    raw_body = await request.body()
+
+    if not verify_signature(raw_body, x_signature):
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    payload = json.loads(raw_body)
+    event_id = payload["event_id"]
+    transaction_id = payload["transaction_id"]
+    new_status = payload["status"]
+
+    db = SessionLocal()
+
+    # Validate the transaction exists BEFORE marking this event as processed,
+    # so a bad or unknown transaction doesn't permanently burn the event_id.
+    attempt = db.query(GatewayAttempt).filter_by(transaction_id=transaction_id).first()
+    if attempt is None:
+        db.close()
+        raise HTTPException(status_code=404, detail="Unknown transaction_id")
+
+    try:
+        db.add(ProcessedWebhook(event_id=event_id))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        db.close()
+        return {"status": "already_processed"}
+
+    payment = db.query(Payment).filter_by(id=attempt.payment_id).first()
+    old_status = payment.status
+    payment.status = new_status
+    db.add(AuditLog(
+        payment_id=payment.id,
+        old_status=old_status,
+        new_status=new_status,
+        note="Updated via webhook",
+    ))
+    db.commit()
+    payment_id = payment.id
+    db.close()
+
+    return {"status": "ok", "payment_id": payment_id, "new_status": new_status}

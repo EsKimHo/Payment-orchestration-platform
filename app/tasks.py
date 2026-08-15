@@ -80,6 +80,8 @@ def process_payment(payment_id: int):
     payment.status = "failed"
     db.add(AuditLog(payment_id=payment.id, old_status=old_status, new_status="failed"))
     db.commit()
+
+    payment_id=payment.id
     db.close()
 
-    task_queue.enqueue(process_payment, payment.id)  # requeue for another full round
+    task_queue.enqueue(process_payment, payment_id)  # requeue for another full round
