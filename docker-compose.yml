@@ -45,6 +45,16 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
-
+  scheduler:
+    build: .
+    command: rq-scheduler --host redis --port 6379 --db 0 --interval 5 
+    volumes:
+      - ./app:/code/app
+    depends_on:
+      - redis
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      
 volumes:
   pgdata:
