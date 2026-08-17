@@ -7,7 +7,9 @@ from app.models import Payment, IdempotencyKey, AuditLog, GatewayAttempt, Proces
 from app.queue_config import task_queue
 from app.tasks import process_payment
 from app.security import verify_signature
+from app.admin import router as admin_router
 app = FastAPI()
+app.include_router(admin_router)
 
 
 class PaymentRequest(BaseModel):

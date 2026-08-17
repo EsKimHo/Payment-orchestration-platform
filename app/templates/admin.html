@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Control Center — Payment Orchestration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050810;
+    --grid-line: rgba(45, 212, 255, 0.05);
+    --panel: rgba(11, 18, 32, 0.72);
+    --border: rgba(45, 212, 255, 0.18);
+    --border-bright: rgba(45, 212, 255, 0.55);
+    --accent: #2dd4ff;
+    --accent-dim: #1a8fb0;
+    --text: #dbeeff;
+    --text-dim: #5f7590;
+    --green: #34e7a1;
+    --amber: #ffc857;
+    --red: #ff5c72;
+    --purple: #b78cff;
+    --mono: 'JetBrains Mono', Consolas, monospace;
+    --display: 'Orbitron', var(--mono);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--bg);
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 42px 42px;
+    color: var(--text);
+    font-family: var(--mono);
+    padding: 32px 24px 80px;
+  }
+
+  .glow-bg {
+    position: fixed;
+    top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 900px; height: 500px;
+    background: radial-gradient(circle, rgba(45,212,255,0.10) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: 22px;
+    letter-spacing: 1.5px;
+    margin: 0;
+    color: var(--accent);
+    text-shadow: 0 0 18px rgba(45,212,255,0.4);
+  }
+  h1 span { color: var(--text-dim); font-size: 13px; display: block; letter-spacing: 3px; margin-top: 4px; }
+
+  .system-status {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; letter-spacing: 1px; color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: var(--panel);
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green), 0 0 14px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 16px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .stat-card:hover { border-color: var(--border-bright); transform: translateY(-2px); }
+  .stat-label { font-size: 11px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; }
+  .stat-value { font-family: var(--display); font-size: 30px; margin-top: 6px; }
+  .stat-total .stat-value { color: var(--accent); }
+  .stat-pending .stat-value { color: var(--amber); }
+  .stat-succeeded .stat-value { color: var(--green); }
+  .stat-failed .stat-value { color: var(--red); }
+  .stat-dead_letter .stat-value { color: var(--purple); }
+
+  .filters { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .filter-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: var(--border-bright); color: var(--text); }
+  .filter-btn.active { background: rgba(45,212,255,0.12); border-color: var(--accent); color: var(--accent); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left;
+    font-size: 10.5px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr.data-row { border-bottom: 1px solid rgba(45,212,255,0.06); cursor: pointer; transition: background 0.15s; }
+  tbody tr.data-row:hover { background: rgba(45,212,255,0.04); }
+  td { padding: 13px 16px; vertical-align: middle; }
+  .mono-id { color: var(--accent); }
+  .dim { color: var(--text-dim); }
+
+  .badge {
+    display: inline-block;
+    font-size: 10.5px;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid;
+    font-weight: 600;
+  }
+  .badge-pending { color: var(--amber); border-color: var(--amber); background: rgba(255,200,87,0.08); }
+  .badge-succeeded { color: var(--green); border-color: var(--green); background: rgba(52,231,161,0.08); }
+  .badge-failed { color: var(--red); border-color: var(--red); background: rgba(255,92,114,0.08); }
+  .badge-dead_letter { color: var(--purple); border-color: var(--purple); background: rgba(183,140,255,0.1); }
+
+  .caret { color: var(--text-dim); font-size: 11px; transition: transform 0.2s; display: inline-block; }
+  .caret.open { transform: rotate(90deg); color: var(--accent); }
+
+  .replay-btn {
+    background: transparent;
+    border: 1px solid var(--red);
+    color: var(--red);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .replay-btn:hover { background: rgba(255,92,114,0.12); box-shadow: 0 0 12px rgba(255,92,114,0.3); }
+  .replay-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .detail-row td { background: rgba(0,0,0,0.25); padding: 20px 24px; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .detail-col h4 {
+    font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--text-dim); margin: 0 0 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px;
+  }
+  .timeline-item {
+    position: relative;
+    padding-left: 18px;
+    margin-bottom: 14px;
+    border-left: 1px solid var(--border);
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute; left: -4px; top: 4px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+  }
+  .timeline-item .t-title { font-size: 12.5px; color: var(--text); }
+  .timeline-item .t-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .timeline-item .t-note { font-size: 11px; color: var(--accent); margin-top: 4px; font-style: italic; }
+  .empty-note { color: var(--text-dim); font-size: 12px; }
+
+  #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 50; display: flex; flex-direction: column; gap: 10px; }
+  .toast {
+    background: var(--panel);
+    border: 1px solid var(--border-bright);
+    border-left: 3px solid var(--accent);
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    box-shadow: 0 0 20px rgba(45,212,255,0.15);
+    animation: slideIn 0.25s ease-out;
+  }
+  .toast.error { border-left-color: var(--red); }
+  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="glow-bg"></div>
+  <div class="wrap">
+    <header>
+      <h1>PAYMENT ORCHESTRATION<span>CONTROL CENTER</span></h1>
+      <div class="system-status"><span class="dot"></span> LIVE · REFRESHING EVERY 5S</div>
+    </header>
+
+    <div class="stats">
+      <div class="stat-card stat-total"><div class="stat-label">Total</div><div class="stat-value" id="stat-total">—</div></div>
+      <div class="stat-card stat-pending"><div class="stat-label">Pending</div><div class="stat-value" id="stat-pending">—</div></div>
+      <div class="stat-card stat-succeeded"><div class="stat-label">Succeeded</div><div class="stat-value" id="stat-succeeded">—</div></div>
+      <div class="stat-card stat-failed"><div class="stat-label">Failed</div><div class="stat-value" id="stat-failed">—</div></div>
+      <div class="stat-card stat-dead_letter"><div class="stat-label">Dead Letter</div><div class="stat-value" id="stat-dead_letter">—</div></div>
+    </div>
+
+    <div class="filters" id="filters">
+      <button class="filter-btn active" data-filter="all">ALL</button>
+      <button class="filter-btn" data-filter="pending">PENDING</button>
+      <button class="filter-btn" data-filter="succeeded">SUCCEEDED</button>
+      <button class="filter-btn" data-filter="failed">FAILED</button>
+      <button class="filter-btn" data-filter="dead_letter">DEAD LETTER</button>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th></th><th>ID</th><th>Idempotency Key</th><th>Amount</th>
+            <th>Status</th><th>Gateway</th><th>Retries</th><th>Created</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div id="empty-state" class="empty-state" style="display:none;">No payments match this filter.</div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+<script>
+  let allPayments = [];
+  let currentFilter = 'all';
+  const expandedIds = new Set();
+  const detailCache = {};
+
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function badge(status) {
+    return `<span class="badge badge-${status}">${status.replace('_',' ')}</span>`;
+  }
+
+  function showToast(message, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = message;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+
+  async function fetchPayments() {
+    const res = await fetch('/admin/api/payments');
+    const data = await res.json();
+    allPayments = data.payments;
+    document.getElementById('stat-total').textContent = data.stats.total;
+    document.getElementById('stat-pending').textContent = data.stats.pending;
+    document.getElementById('stat-succeeded').textContent = data.stats.succeeded;
+    document.getElementById('stat-failed').textContent = data.stats.failed;
+    document.getElementById('stat-dead_letter').textContent = data.stats.dead_letter;
+    renderTable();
+  }
+
+  function renderTable() {
+    const filtered = currentFilter === 'all' ? allPayments : allPayments.filter(p => p.status === currentFilter);
+    const body = document.getElementById('table-body');
+    const emptyState = document.getElementById('empty-state');
+
+    if (filtered.length === 0) {
+      body.innerHTML = '';
+      emptyState.style.display = 'block';
+      return;
+    }
+    emptyState.style.display = 'none';
+
+    body.innerHTML = filtered.map(p => {
+      const isOpen = expandedIds.has(p.id);
+      const canReplay = p.status === 'failed' || p.status === 'dead_letter';
+      let rows = `
+        <tr class="data-row" data-id="${p.id}">
+          <td><span class="caret ${isOpen ? 'open' : ''}">▶</span></td>
+          <td class="mono-id">#${p.id}</td>
+          <td>${p.idempotency_key}</td>
+          <td>${p.amount} ${p.currency}</td>
+          <td>${badge(p.status)}</td>
+          <td class="dim">${p.gateway_used || '—'}</td>
+          <td class="dim">${p.retry_count}</td>
+          <td class="dim">${fmtTime(p.created_at)}</td>
+          <td>${canReplay ? `<button class="replay-btn" data-replay="${p.id}">REPLAY</button>` : ''}</td>
+        </tr>`;
+      if (isOpen) {
+        rows += `<tr class="detail-row" data-detail-for="${p.id}"><td colspan="9">${renderDetail(p.id)}</td></tr>`;
+      }
+      return rows;
+    }).join('');
+
+    document.querySelectorAll('.data-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.replay-btn')) return;
+        toggleExpand(parseInt(row.dataset.id));
+      });
+    });
+    document.querySelectorAll('[data-replay]').forEach(btn => {
+      btn.addEventListener('click', (e) => { e.stopPropagation(); replayPayment(parseInt(btn.dataset.replay), btn); });
+    });
+  }
+
+  function renderDetail(id) {
+    const detail = detailCache[id];
+    if (!detail) return `<div class="empty-note">Loading...</div>`;
+
+    const attemptsHtml = detail.gateway_attempts.length
+      ? detail.gateway_attempts.map(a => `
+          <div class="timeline-item">
+            <div class="t-title">${a.gateway_name} — attempt ${a.attempt_number} — ${a.status}</div>
+            <div class="t-meta">${fmtTime(a.created_at)}${a.transaction_id ? ' · ' + a.transaction_id.slice(0,8) + '…' : ''}</div>
+          </div>`).join('')
+      : `<div class="empty-note">No gateway attempts recorded.</div>`;
+
+    const logHtml = detail.audit_log.length
+      ? detail.audit_log.map(l => `
+          <div class="timeline-item">
+            <div class="t-title">${l.old_status || 'created'} → ${l.new_status}</div>
+            <div class="t-meta">${fmtTime(l.changed_at)}</div>
+            ${l.note ? `<div class="t-note">${l.note}</div>` : ''}
+          </div>`).join('')
+      : `<div class="empty-note">No audit history.</div>`;
+
+    return `<div class="detail-grid">
+      <div class="detail-col"><h4>Gateway Attempts</h4>${attemptsHtml}</div>
+      <div class="detail-col"><h4>Audit Trail</h4>${logHtml}</div>
+    </div>`;
+  }
+
+  async function toggleExpand(id) {
+    if (expandedIds.has(id)) {
+      expandedIds.delete(id);
+      renderTable();
+      return;
+    }
+    expandedIds.add(id);
+    renderTable();
+    if (!detailCache[id]) {
+      const res = await fetch(`/admin/api/payments/${id}`);
+      detailCache[id] = await res.json();
+      renderTable();
+    }
+  }
+
+  async function replayPayment(id, btn) {
+    btn.disabled = true;
+    btn.textContent = 'REPLAYING…';
+    try {
+      const res = await fetch(`/admin/payments/${id}/replay`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(`Payment #${id}: ${data.detail}`, 'error');
+      } else {
+        showToast(`Payment #${id} requeued with a fresh retry budget`);
+        delete detailCache[id];
+      }
+    } catch (err) {
+      showToast('Network error while replaying', 'error');
+    }
+    await fetchPayments();
+  }
+
+  document.getElementById('filters').addEventListener('click', (e) => {
+    const btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    renderTable();
+  });
+
+  fetchPayments();
+  setInterval(fetchPayments, 5000);
+</script>
+</body>
+</html>

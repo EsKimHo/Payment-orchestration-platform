@@ -6,3 +6,4 @@ alembic
 redis
 rq
 rq-scheduler
+jinja2
