@@ -16,8 +16,7 @@ Payment gateways fail, time out, and occasionally deliver the same "success" web
 - A lost webhook doesn't mean a lost payment — a scheduled reconciliation job catches and self-heals the discrepancy.
 
 ## Architecture
-
-
+---
                      ┌─────────────┐
    client  ────────► │   FastAPI   │ ── writes ──►  ┌────────────┐
                      │   (web)     │                │ PostgreSQL │
@@ -41,7 +40,7 @@ Payment gateways fail, time out, and occasionally deliver the same "success" web
        │  webhooks)   │            └──────────────┘
        └──────────────┘
 
-
+---
 `web`, `worker`, and `scheduler` are three independent processes built from the same codebase — they can be scaled or restarted independently of each other, the same way real payment infrastructure separates request-handling capacity from background-processing capacity.
 
 ## Core Features
