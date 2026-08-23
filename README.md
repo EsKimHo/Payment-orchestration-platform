@@ -16,31 +16,9 @@ Payment gateways fail, time out, and occasionally deliver the same "success" web
 - A lost webhook doesn't mean a lost payment — a scheduled reconciliation job catches and self-heals the discrepancy.
 
 ## Architecture
----
-                     ┌─────────────┐
-   client  ────────► │   FastAPI   │ ── writes ──►  ┌────────────┐
-                     │   (web)     │                │ PostgreSQL │
-                     └──────┬──────┘ ── reads  ────►│            │
-                            │                        └────────────┘
-                      enqueues job                          ▲
-                            │                                │
-                            ▼                                │
-                     ┌─────────────┐                         │
-                     │    Redis    │                         │
-                     │ (queue +    │                         │
-                     │  idempotency)│                        │
-                     └──────┬──────┘                         │
-                            │                                │
-              ┌─────────────┴─────────────┐                  │
-              ▼                           ▼                  │
-       ┌─────────────┐            ┌──────────────┐          │
-       │  RQ Worker   │            │ RQ Scheduler │           │
-       │ (retries,    │───────────►│ (reconciles  │───────────┘
-       │  failover,   │  writes    │  every 60s)  │
-       │  webhooks)   │            └──────────────┘
-       └──────────────┘
+<img width="657" height="574" alt="image" src="https://github.com/user-attachments/assets/ca7e680f-827f-40df-aee3-882f6537b824" />
 
----
+
 `web`, `worker`, and `scheduler` are three independent processes built from the same codebase — they can be scaled or restarted independently of each other, the same way real payment infrastructure separates request-handling capacity from background-processing capacity.
 
 ## Core Features
